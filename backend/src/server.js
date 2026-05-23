@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { runAgentQuery } from './agent/gemini.js';
 import { connectDB } from './db/connection.js';
+import { startSimulator } from './simulator/trafficSimulator.js';
+import { runScenario, SCENARIOS } from './scenarios/scenarioRunner.js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
@@ -14,10 +16,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ── HEALTH ────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'MallMind Agent API', timestamp: new Date() });
+  res.json({
+    status: 'ok',
+    service: 'MallMind Agent API',
+    timestamp: new Date()
+  });
 });
 
+// ── AGENT ─────────────────────────────────────────────────────────
 app.post('/api/agent', async (req, res) => {
   const { message, sessionId } = req.body;
   if (!message) return res.status(400).json({ error: 'message is required' });
@@ -32,13 +40,37 @@ app.post('/api/agent', async (req, res) => {
   }
 });
 
+// ── SCENARIOS ─────────────────────────────────────────────────────
+app.get('/api/scenarios', (req, res) => {
+  res.json(Object.values(SCENARIOS).map(s => ({
+    id: s.id,
+    name: s.name,
+    description: s.description
+  })));
+});
+
+app.post('/api/scenarios/:id', async (req, res) => {
+  const { id } = req.params;
+  const { param, sessionId } = req.body;
+  try {
+    const result = await runScenario(id, param, sessionId);
+    res.json(result);
+  } catch (err) {
+    console.error('Scenario error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── TRAFFIC ───────────────────────────────────────────────────────
 app.get('/api/traffic', async (req, res) => {
   try {
     const db = await connectDB();
+    const { zoneId, limit = 50 } = req.query;
+    const query = zoneId ? { zoneId } : {};
     const data = await db.collection('foot_traffic')
-      .find({})
+      .find(query)
       .sort({ timestamp: -1 })
-      .limit(50)
+      .limit(parseInt(limit))
       .toArray();
     res.json(data);
   } catch (err) {
@@ -46,11 +78,14 @@ app.get('/api/traffic', async (req, res) => {
   }
 });
 
+// ── INCIDENTS ─────────────────────────────────────────────────────
 app.get('/api/incidents', async (req, res) => {
   try {
     const db = await connectDB();
+    const { status } = req.query;
+    const query = status ? { status } : {};
     const data = await db.collection('incidents')
-      .find({})
+      .find(query)
       .sort({ createdAt: -1 })
       .toArray();
     res.json(data);
@@ -59,11 +94,14 @@ app.get('/api/incidents', async (req, res) => {
   }
 });
 
+// ── CAMPAIGNS ─────────────────────────────────────────────────────
 app.get('/api/campaigns', async (req, res) => {
   try {
     const db = await connectDB();
+    const { status } = req.query;
+    const query = status ? { status } : {};
     const data = await db.collection('campaigns')
-      .find({})
+      .find(query)
       .sort({ createdAt: -1 })
       .toArray();
     res.json(data);
@@ -72,38 +110,123 @@ app.get('/api/campaigns', async (req, res) => {
   }
 });
 
+// ── ZONES ─────────────────────────────────────────────────────────
+app.get('/api/zones', async (req, res) => {
+  try {
+    const db = await connectDB();
+    const data = await db.collection('zones').find({}).toArray();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── TENANTS ───────────────────────────────────────────────────────
+app.get('/api/tenants', async (req, res) => {
+  try {
+    const db = await connectDB();
+    const { zoneId } = req.query;
+    const query = zoneId ? { zoneId } : {};
+    const data = await db.collection('tenants').find(query).toArray();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── AGENT LOGS ────────────────────────────────────────────────────
+app.get('/api/logs', async (req, res) => {
+  try {
+    const db = await connectDB();
+    const data = await db.collection('agent_logs')
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .toArray();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── DASHBOARD ─────────────────────────────────────────────────────
+app.get('/api/dashboard', async (req, res) => {
+  try {
+    const db = await connectDB();
+
+    const [latestTraffic, activeIncidents, activeCampaigns, recentLogs, zones, tenants] = await Promise.all([
+      // Latest reading per zone using aggregation
+      db.collection('foot_traffic').aggregate([
+        { $sort: { timestamp: -1 } },
+        { $group: { _id: '$zoneId', latest: { $first: '$$ROOT' } } },
+        { $replaceRoot: { newRoot: '$latest' } },
+        { $sort: { zoneId: 1 } }
+      ]).toArray(),
+
+      // All open or in-progress incidents
+      db.collection('incidents')
+        .find({ status: { $in: ['open', 'in_progress'] } })
+        .sort({ createdAt: -1 })
+        .toArray(),
+
+      // All active campaigns
+      db.collection('campaigns')
+        .find({ status: 'active' })
+        .sort({ createdAt: -1 })
+        .toArray(),
+
+      // Last 10 agent actions
+      db.collection('agent_logs')
+        .find({})
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .toArray(),
+
+      // All zones
+      db.collection('zones').find({}).toArray(),
+
+      // All tenants
+      db.collection('tenants').find({}).toArray()
+    ]);
+
+    // Compute mall-wide summary
+    const totalOccupancy = latestTraffic.reduce((sum, z) => sum + (z.count || 0), 0);
+    const totalCapacity = latestTraffic.reduce((sum, z) => sum + (z.capacity || 0), 0);
+    const criticalZones = latestTraffic.filter(z => z.alertLevel === 'critical').map(z => z.zoneName);
+    const highZones = latestTraffic.filter(z => z.alertLevel === 'high').map(z => z.zoneName);
+
+    res.json({
+      timestamp: new Date(),
+      summary: {
+        totalOccupancy,
+        totalCapacity,
+        mallOccupancyPct: totalCapacity > 0 ? Math.round((totalOccupancy / totalCapacity) * 100) : 0,
+        criticalZones,
+        highZones,
+        activeIncidentCount: activeIncidents.length,
+        activeCampaignCount: activeCampaigns.length
+      },
+      zones: latestTraffic,
+      activeIncidents,
+      activeCampaigns,
+      recentAgentActions: recentLogs,
+      allZones: zones,
+      allTenants: tenants
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── START ─────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
 
-function listenOnPort(port) {
-  return new Promise((resolve, reject) => {
-    const server = app.listen(port, () => resolve(server));
-    server.once('error', reject);
+connectDB().then(() => {
+  startSimulator(30);
+
+  app.listen(PORT, () => {
+    console.log(`MallMind API running on http://localhost:${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
+    console.log(`Live traffic simulator running — new readings every 30s`);
   });
-}
-
-async function startServer(initialPort) {
-  let port = Number(initialPort);
-
-  while (true) {
-    try {
-      await listenOnPort(port);
-      console.log(`MallMind API running on http://localhost:${port}`);
-      console.log(`Health check: http://localhost:${port}/health`);
-      return;
-    } catch (err) {
-      if (err.code !== 'EADDRINUSE') {
-        throw err;
-      }
-
-      console.warn(`Port ${port} is already in use. Trying ${port + 1}...`);
-      port += 1;
-    }
-  }
-}
-
-connectDB()
-  .then(() => startServer(PORT))
-  .catch((err) => {
-    console.error('Server startup failed:', err);
-    process.exit(1);
-  });
+});
