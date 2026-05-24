@@ -7,6 +7,15 @@ import { runScenario, SCENARIOS } from './scenarios/scenarioRunner.js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import { agentModel, genaiBackend, genaiLocation, genaiProject } from './lib/genai.js';
+import {
+  getZonePerformance,
+  getHourlyPattern,
+  getIncidentSummary,
+  getCampaignStats,
+  getTrafficTrend
+} from './analytics/aggregations.js';
+import { embedIncident } from './tools/vectorSearch.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -221,12 +230,77 @@ app.get('/api/dashboard', async (req, res) => {
 // ── START ─────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
 
+// ── ANALYTICS ─────────────────────────────────────────────────────
+app.get('/api/analytics/zones', async (req, res) => {
+  try {
+    const { hours = 24 } = req.query;
+    const data = await getZonePerformance(parseInt(hours));
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/analytics/hourly/:zoneId', async (req, res) => {
+  try {
+    const { zoneId } = req.params;
+    const { days = 7 } = req.query;
+    const data = await getHourlyPattern(zoneId, parseInt(days));
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/analytics/incidents', async (req, res) => {
+  try {
+    const { days = 7 } = req.query;
+    const data = await getIncidentSummary(parseInt(days));
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/analytics/campaigns', async (req, res) => {
+  try {
+    const { days = 7 } = req.query;
+    const data = await getCampaignStats(parseInt(days));
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/analytics/trend', async (req, res) => {
+  try {
+    const { zoneId } = req.query;
+    const data = await getTrafficTrend(zoneId);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Embed a specific incident for vector search
+app.post('/api/incidents/:incidentId/embed', async (req, res) => {
+  try {
+    const { incidentId } = req.params;
+    const result = await embedIncident(incidentId);
+    res.json({ success: !!result, incidentId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 connectDB().then(() => {
   startSimulator(30);
 
   app.listen(PORT, () => {
     console.log(`MallMind API running on http://localhost:${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/health`);
+    console.log(`GenAI backend: ${genaiBackend} | model: ${agentModel}${genaiBackend === 'vertex' ? ` | project: ${genaiProject} | location: ${genaiLocation}` : ''}`);
     console.log(`Live traffic simulator running — new readings every 30s`);
   });
 });

@@ -1,20 +1,7 @@
-import { GoogleGenAI } from '@google/genai';
 import { toolDefinitions } from '../tools/index.js';
 import { runTool } from './toolRunner.js';
 import { logAgentAction } from '../tools/index.js';
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname, resolve } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-dotenv.config({ path: resolve(__dirname, '../../../.env') });
-
-const ai = new GoogleGenAI({
-  vertexai: true,
-  project: 'mallmind-agent',
-  location: 'us-central1'
-});
+import { ai, agentModel, formatGenAIError } from '../lib/genai.js';
 
 const tools = [{
   functionDeclarations: toolDefinitions.map(t => ({
@@ -33,14 +20,14 @@ Your responsibilities:
 - Trigger marketing campaigns to redirect traffic or boost revenue
 - Log all incidents with proper severity levels
 - Check weather to predict traffic patterns
-- Learn from historical incidents
+- Use vector search to find similar past incidents and learn from them
 
 When responding:
 1. ALWAYS check weather context first when assessing any crowd or traffic situation
-2. Query actual data before making recommendations
-3. Log incidents when you detect real problems
-4. Trigger campaigns when action is needed
-5. Be concise but thorough in your reasoning
+2. Use find_similar_incidents BEFORE logging a new incident to learn from history
+3. Query actual data before making recommendations
+4. Log incidents when you detect real problems
+5. Trigger campaigns when action is needed
 6. Always tell the operator what actions you took and what was written to the database
 
 You are managing Westfield Grand Mall in Dallas, TX.`;
@@ -58,14 +45,19 @@ export async function runAgentQuery(userMessage, sessionId) {
   while (iterations < maxIterations) {
     iterations++;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents,
-      config: {
-        systemInstruction,
-        tools
-      }
-    });
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model: agentModel,
+        contents,
+        config: {
+          systemInstruction,
+          tools
+        }
+      });
+    } catch (err) {
+      throw formatGenAIError(err);
+    }
 
     const candidate = response.candidates[0];
     const parts = candidate.content.parts;
@@ -83,20 +75,22 @@ export async function runAgentQuery(userMessage, sessionId) {
       break;
     }
 
-    const toolResults = [];
+    // Fix: send each tool result as a separate content item
     for (const part of functionCalls) {
       const { name, args } = part.functionCall;
       toolsUsed.push(name);
       const result = await runTool(name, args);
-      toolResults.push({
-        functionResponse: {
-          name,
-          response: result
-        }
+
+      contents.push({
+        role: 'user',
+        parts: [{
+          functionResponse: {
+            name,
+            response: { output: JSON.stringify(result) }
+          }
+        }]
       });
     }
-
-    contents.push({ role: 'user', parts: toolResults });
   }
 
   await logAgentAction({

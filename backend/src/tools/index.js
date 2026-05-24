@@ -1,5 +1,15 @@
-export { queryTraffic, getTenantsByZone, logIncident, getIncidentHistory, triggerCampaign, updateIncidentStatus, logAgentAction } from './mongoTools.js';
+export {
+  queryTraffic,
+  getTenantsByZone,
+  logIncident,
+  getIncidentHistory,
+  triggerCampaign,
+  updateIncidentStatus,
+  logAgentAction
+} from './mongoTools.js';
+
 export { getWeatherContext } from './weatherTool.js';
+export { findSimilarIncidents, embedIncident } from './vectorSearch.js';
 
 export const toolDefinitions = [
   {
@@ -19,7 +29,7 @@ export const toolDefinitions = [
     parameters: {
       type: 'object',
       properties: {
-        zoneId: { type: 'string', description: 'Zone ID to get tenants for (e.g. zone-north, zone-foodcourt).' }
+        zoneId: { type: 'string', description: 'Zone ID to get tenants for.' }
       },
       required: ['zoneId']
     }
@@ -35,36 +45,48 @@ export const toolDefinitions = [
         title: { type: 'string', description: 'Short title for the incident.' },
         description: { type: 'string', description: 'Detailed description of what happened.' },
         severity: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
-        affectedTenantIds: { type: 'array', items: { type: 'string' }, description: 'List of affected tenant IDs.' }
+        affectedTenantIds: { type: 'array', items: { type: 'string' } }
       },
       required: ['type', 'zoneId', 'title', 'description', 'severity']
     }
   },
   {
     name: 'get_incident_history',
-    description: 'Retrieve past incidents from the database. Use this to find similar past events and learn from previous agent actions.',
+    description: 'Retrieve past incidents from the database.',
     parameters: {
       type: 'object',
       properties: {
-        zoneId: { type: 'string', description: 'Filter by zone ID.' },
-        limit: { type: 'number', description: 'Number of incidents to return. Default 5.' },
-        status: { type: 'string', enum: ['open', 'in_progress', 'resolved'], description: 'Filter by status.' }
+        zoneId: { type: 'string' },
+        limit: { type: 'number' },
+        status: { type: 'string', enum: ['open', 'in_progress', 'resolved'] }
       }
     }
   },
   {
-    name: 'trigger_campaign',
-    description: 'Create and activate a marketing campaign to redirect shopper traffic or boost tenant revenue. Always use this after logging a crowd surge or revenue alert.',
+    name: 'find_similar_incidents',
+    description: 'Use Atlas Vector Search to find semantically similar past incidents. Use this before logging a new incident to learn from how previous similar situations were handled.',
     parameters: {
       type: 'object',
       properties: {
-        title: { type: 'string', description: 'Campaign title.' },
+        query: { type: 'string', description: 'Description of the current situation to find similar past incidents for.' },
+        limit: { type: 'number', description: 'Number of similar incidents to return. Default 3.' }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'trigger_campaign',
+    description: 'Create and activate a marketing campaign to redirect shopper traffic or boost tenant revenue.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
         type: { type: 'string', enum: ['traffic_boost', 'crowd_dispersal', 'promotion', 'emergency'] },
-        targetZoneId: { type: 'string', description: 'Zone to target with this campaign.' },
-        targetTenantIds: { type: 'array', items: { type: 'string' }, description: 'Specific tenants to include.' },
-        message: { type: 'string', description: 'The actual message to display on signage or send via SMS.' },
-        channel: { type: 'array', items: { type: 'string' }, description: 'Channels: digital_signage, sms, mall_app.' },
-        incidentId: { type: 'string', description: 'Link this campaign to an incident ID.' }
+        targetZoneId: { type: 'string' },
+        targetTenantIds: { type: 'array', items: { type: 'string' } },
+        message: { type: 'string' },
+        channel: { type: 'array', items: { type: 'string' } },
+        incidentId: { type: 'string' }
       },
       required: ['title', 'type', 'targetZoneId', 'message']
     }
@@ -75,20 +97,20 @@ export const toolDefinitions = [
     parameters: {
       type: 'object',
       properties: {
-        incidentId: { type: 'string', description: 'The incident ID to update.' },
+        incidentId: { type: 'string' },
         status: { type: 'string', enum: ['open', 'in_progress', 'resolved'] },
-        agentAction: { type: 'string', description: 'Description of what action was taken.' }
+        agentAction: { type: 'string' }
       },
       required: ['incidentId', 'status', 'agentAction']
     }
   },
   {
     name: 'get_weather_context',
-    description: 'Get real-time weather data for the mall city. Use this to predict traffic impact and adjust recommendations. Always call this first when assessing crowd situations.',
+    description: 'Get real-time weather for the mall city. Always call this first when assessing crowd situations.',
     parameters: {
       type: 'object',
       properties: {
-        city: { type: 'string', description: 'City name. Defaults to mall city (Dallas) if omitted.' }
+        city: { type: 'string' }
       }
     }
   }

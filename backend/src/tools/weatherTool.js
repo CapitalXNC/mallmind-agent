@@ -6,9 +6,22 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 dotenv.config({ path: resolve(__dirname, '../../../.env') });
 
+function buildWeatherQueries(city) {
+  const baseCity = (city || process.env.MALL_CITY || 'Dallas').trim();
+  const queries = new Set([baseCity]);
+  const parts = baseCity.split(',').map(part => part.trim()).filter(Boolean);
+
+  if (parts.length === 2 && /^[A-Za-z]{2}$/.test(parts[1])) {
+    queries.add(`${parts[0]},${parts[1].toUpperCase()},US`);
+    queries.add(parts[0]);
+  }
+
+  return [...queries];
+}
+
 export async function getWeatherContext({ city }) {
   const apiKey = process.env.OPENWEATHER_API_KEY;
-  const targetCity = city || process.env.MALL_CITY || 'Dallas';
+  const weatherQueries = buildWeatherQueries(city);
 
   if (!apiKey) {
     return {
@@ -19,12 +32,24 @@ export async function getWeatherContext({ city }) {
   }
 
   try {
-    const url = `https://api.openweathermap.org/data/2.5/weather?q=${targetCity}&appid=${apiKey}&units=imperial`;
-    const response = await fetch(url);
-    const data = await response.json();
+    let data = null;
+    let lastMessage = 'city not found';
 
-    if (data.cod !== 200) {
-      return { success: false, message: data.message, weather: null };
+    for (const query of weatherQueries) {
+      const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(query)}&appid=${apiKey}&units=imperial`;
+      const response = await fetch(url);
+      const result = await response.json();
+
+      if (Number(result.cod) === 200) {
+        data = result;
+        break;
+      }
+
+      lastMessage = result.message || lastMessage;
+    }
+
+    if (!data) {
+      return { success: false, message: lastMessage, weather: null };
     }
 
     const weather = {

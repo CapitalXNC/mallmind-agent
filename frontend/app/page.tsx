@@ -7,6 +7,7 @@ import IncidentPanel from './components/IncidentPanel';
 import CampaignFeed from './components/CampaignFeed';
 import AgentChat from './components/AgentChat';
 import WeatherBadge from './components/WeatherBadge';
+import AnalyticsPanel from './components/AnalyticsPanel';
 
 export default function Home() {
   const { data, loading, error, lastUpdated } = useDashboard(30000);
@@ -29,12 +30,14 @@ export default function Home() {
       </header>
 
       <main className="max-w-screen-2xl mx-auto px-6 py-6">
+        {/* Backend error banner */}
         {error && (
           <div className="bg-red-950 border border-red-800 rounded-xl p-4 mb-6 text-red-300 text-sm">
             ⚠️ Backend connection error: {error}. Make sure the backend server is running on port 3001.
           </div>
         )}
 
+        {/* Loading state */}
         {loading && !data ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
@@ -44,13 +47,17 @@ export default function Home() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Summary row */}
+
+            {/* Row 1: Summary cards */}
             <MallSummary summary={data?.summary} lastUpdated={lastUpdated} />
 
-            {/* Main grid */}
+            {/* Row 2: Main content grid */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              {/* Left: zones + incidents + campaigns */}
+
+              {/* Left col: zones + incidents + campaigns + analytics */}
               <div className="xl:col-span-2 space-y-6">
+
+                {/* Live zone traffic */}
                 <div>
                   <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
                     Live Zone Traffic — updates every 30s
@@ -58,13 +65,18 @@ export default function Home() {
                   <ZoneGrid zones={data?.zones || []} />
                 </div>
 
+                {/* Incidents + Campaigns side by side */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <IncidentPanel incidents={data?.activeIncidents || []} />
                   <CampaignFeed campaigns={data?.activeCampaigns || []} />
                 </div>
+
+                {/* Analytics panel — MongoDB aggregation pipelines */}
+                <AnalyticsPanel />
+
               </div>
 
-              {/* Right: agent chat */}
+              {/* Right col: Agent chat */}
               <div className="xl:col-span-1 h-[700px]">
                 <AgentChat
                   messages={messages}
@@ -73,6 +85,7 @@ export default function Home() {
                   isThinking={isThinking}
                 />
               </div>
+
             </div>
           </div>
         )}
