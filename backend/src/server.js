@@ -22,7 +22,17 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: resolve(__dirname, '../../.env') });
 
 const app = express();
-app.use(cors());
+
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'https://mallmind-agent.vercel.app',
+    'https://mallmind-agent-o3k7l6og3-somnilmitra123-8259s-projects.vercel.app'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
 // ── HEALTH ────────────────────────────────────────────────────────
@@ -228,6 +238,7 @@ app.get('/api/dashboard', async (req, res) => {
 });
 
 // ── START ─────────────────────────────────────────────────────────
+// ── START ─────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
 
 // ── ANALYTICS ─────────────────────────────────────────────────────
@@ -282,7 +293,6 @@ app.get('/api/analytics/trend', async (req, res) => {
   }
 });
 
-// Embed a specific incident for vector search
 app.post('/api/incidents/:incidentId/embed', async (req, res) => {
   try {
     const { incidentId } = req.params;
@@ -293,13 +303,13 @@ app.post('/api/incidents/:incidentId/embed', async (req, res) => {
   }
 });
 
-
+// ── LAUNCH ────────────────────────────────────────────────────────
 connectDB().then(() => {
   startSimulator(30);
 
-  app.listen(PORT, () => {
-    console.log(`MallMind API running on http://localhost:${PORT}`);
-    console.log(`Health check: http://localhost:${PORT}/health`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`MallMind API running on http://0.0.0.0:${PORT}`);
+    console.log(`Health check: http://0.0.0.0:${PORT}/health`);
     console.log(`GenAI backend: ${genaiBackend} | model: ${agentModel}${genaiBackend === 'vertex' ? ` | project: ${genaiProject} | location: ${genaiLocation}` : ''}`);
     console.log(`Live traffic simulator running — new readings every 30s`);
   });
