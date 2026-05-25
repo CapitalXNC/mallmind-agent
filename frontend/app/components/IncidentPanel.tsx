@@ -1,5 +1,8 @@
 'use client';
 
+import { CheckCircle2, Lock, TrendingDown, TriangleAlert, Users, Wrench } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
 interface Incident {
   incidentId: string;
   type: string;
@@ -13,71 +16,120 @@ interface Incident {
 
 interface Props {
   incidents: Incident[];
+  embedded?: boolean;
 }
 
-const severityColors: Record<string, string> = {
-  critical: 'text-red-400 border-red-800',
-  high: 'text-orange-400 border-orange-800',
-  medium: 'text-yellow-400 border-yellow-800',
-  low: 'text-green-400 border-green-800'
+const severityColors: Record<string, { border: string; text: string; chip: string }> = {
+  critical: {
+    border: 'border-red-500/60',
+    text: 'text-red-200',
+    chip: 'border-red-500/50 bg-red-950/70 text-red-200'
+  },
+  high: {
+    border: 'border-orange-500/55',
+    text: 'text-orange-200',
+    chip: 'border-orange-500/50 bg-orange-950/70 text-orange-200'
+  },
+  medium: {
+    border: 'border-amber-500/45',
+    text: 'text-amber-100',
+    chip: 'border-amber-500/40 bg-amber-950/45 text-amber-100'
+  },
+  low: {
+    border: 'border-emerald-500/35',
+    text: 'text-emerald-200',
+    chip: 'border-emerald-500/30 bg-emerald-950/35 text-emerald-200'
+  }
 };
 
-const typeIcons: Record<string, string> = {
-  crowd_surge: '👥',
-  maintenance: '🔧',
-  revenue_alert: '📉',
-  security: '🔒',
-  other: '⚠️'
+const typeIcons: Record<string, LucideIcon> = {
+  crowd_surge: Users,
+  maintenance: Wrench,
+  revenue_alert: TrendingDown,
+  security: Lock,
+  other: TriangleAlert
 };
 
-export default function IncidentPanel({ incidents }: Props) {
-  return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 h-full">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-white uppercase tracking-wider">Active Incidents</h2>
-        <span className={`text-xs px-2 py-0.5 rounded-full ${incidents.length > 0 ? 'bg-red-900 text-red-300' : 'bg-gray-800 text-gray-400'}`}>
-          {incidents.length} active
-        </span>
-      </div>
-
-      {incidents.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8 text-center">
-          <span className="text-3xl mb-2">✅</span>
-          <p className="text-sm text-gray-400">No active incidents</p>
-          <p className="text-xs text-gray-600 mt-1">All zones operating normally</p>
+export default function IncidentPanel({ incidents, embedded = false }: Props) {
+  const body = incidents.length === 0 ? (
+        <div className="grid min-h-44 place-items-center border border-[#1c1726] bg-[#07060a] p-6 text-center">
+          <div>
+            <div className="mx-auto mb-3 grid h-10 w-10 place-items-center border border-emerald-500/30 bg-emerald-950/25 text-emerald-200">
+              <CheckCircle2 size={18} />
+            </div>
+            <p className="text-sm font-medium text-white">No active incidents</p>
+            <p className="mt-1 text-xs text-[#7f768f]">All zones are operating within tolerance.</p>
+          </div>
         </div>
       ) : (
-        <div className="space-y-3 overflow-y-auto max-h-80">
-          {incidents.map(incident => {
+        <div className="max-h-96 space-y-3 overflow-y-auto pr-1">
+          {incidents.map((incident, index) => {
             const colors = severityColors[incident.severity] || severityColors.low;
-            const icon = typeIcons[incident.type] || typeIcons.other;
+            const Icon = typeIcons[incident.type] || typeIcons.other;
             return (
-              <div key={incident.incidentId} className={`border rounded-lg p-3 ${colors}`}>
-                <div className="flex items-start gap-2 mb-2">
-                  <span className="text-base">{icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{incident.title}</p>
-                    <p className="text-xs text-gray-400">{incident.zoneName} · {incident.severity.toUpperCase()}</p>
+              <article
+                key={incident.incidentId}
+                className={`panel-enter border ${colors.border} bg-[#0d0b13] p-3`}
+                style={{ animationDelay: `${index * 45}ms` }}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`grid h-8 w-8 shrink-0 place-items-center border ${colors.border} bg-[#120d1d] ${colors.text}`}>
+                    <Icon size={15} strokeWidth={1.8} />
                   </div>
-                  <span className="text-xs bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full shrink-0">
-                    {incident.status}
-                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="min-w-0 text-sm font-semibold text-white">{incident.title}</p>
+                      <span className="shrink-0 border border-[#2b243a] bg-[#111019] px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[#c8c1d6]">
+                        {incident.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-[#8f879d]">
+                      {incident.zoneName} / {incident.severity.toUpperCase()}
+                    </p>
+                  </div>
                 </div>
+
                 {incident.agentActions?.length > 0 && (
-                  <div className="ml-6">
-                    {incident.agentActions.slice(-2).map((action, i) => (
-                      <p key={i} className="text-xs text-gray-500 truncate">→ {action}</p>
+                  <div className="mt-3 space-y-1 border-l border-[#2b243a] pl-3">
+                    {incident.agentActions.slice(-2).map((action, actionIndex) => (
+                      <p key={actionIndex} className="truncate text-xs text-[#8f879d]" title={action}>
+                        {action}
+                      </p>
                     ))}
                   </div>
                 )}
-                <p className="text-xs text-gray-700 mt-1 ml-6">
+
+                <p className="mt-3 text-xs text-[#655d72]">
                   {new Date(incident.createdAt).toLocaleTimeString()}
                 </p>
-              </div>
+              </article>
             );
           })}
         </div>
-      )}
-    </div>
+      );
+
+  if (embedded) {
+    return <div>{body}</div>;
+  }
+
+  return (
+    <section className="panel-edge click-adapt border border-[#241d34] bg-[#09080d]/95 p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-[0.24em] text-white">
+            Active Incidents
+          </h2>
+          <p className="mt-1 text-xs text-[#7f768f]">Open operational alerts</p>
+        </div>
+        <span className={`border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
+          incidents.length > 0
+            ? 'border-red-500/50 bg-red-950/60 text-red-200'
+            : 'border-[#2b243a] bg-[#111019] text-[#8f879d]'
+        }`}>
+          {incidents.length} active
+        </span>
+      </div>
+      {body}
+    </section>
   );
 }

@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #050407;
+  --foreground: #f4f2ff;
+  --panel: #0b0a10;
+  --panel-strong: #100d18;
+  --border: #272235;
+  --border-strong: #5c3d86;
+  --violet: #8b5cf6;
+  --violet-soft: #2b1947;
+  --muted: #9a93a9;
+  --font-geist-sans: "Inter", "Segoe UI", Arial, Helvetica, sans-serif;
+  --font-geist-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
 }
 
 @theme inline {
@@ -12,15 +21,189 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #4c356f #08070c;
+}
+
+*::selection {
+  background: rgba(139, 92, 246, 0.35);
+  color: #ffffff;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #08070c;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4c356f;
+  border: 2px solid #08070c;
+}
+
+.ops-grid {
+  background:
+    linear-gradient(rgba(139, 92, 246, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.035) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(33, 20, 53, 0.42), rgba(5, 4, 7, 0) 42%),
+    #050407;
+  background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%;
+}
+
+.panel-edge {
+  position: relative;
+  overflow: hidden;
+}
+
+.panel-edge::before {
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.9), rgba(139, 92, 246, 0));
+  content: "";
+  height: 52%;
+  left: 0;
+  opacity: 0.65;
+  position: absolute;
+  top: 0;
+  width: 1px;
+}
+
+.click-adapt {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.click-adapt:hover {
+  border-color: rgba(139, 92, 246, 0.58);
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.1), 0 18px 42px rgba(0, 0, 0, 0.32);
+  transform: translateY(-1px);
+}
+
+.click-adapt:active {
+  transform: translateY(0) scale(0.995);
+}
+
+.scanline {
+  position: relative;
+}
+
+.scanline::after {
+  animation: scanline 4.8s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.18), transparent);
+  content: "";
+  height: 1px;
+  left: 0;
+  opacity: 0.7;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+@keyframes scanline {
+  0%, 100% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel-enter {
+  animation: panel-enter 420ms ease both;
+}
+
+@keyframes meter-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.meter-fill {
+  animation: meter-fill 650ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: left center;
+}
+
+.landing-shell {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(139, 92, 246, 0.18), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 50%, rgba(110, 231, 183, 0.06), transparent),
+    linear-gradient(180deg, #08060f 0%, #050407 55%, #050407 100%);
+}
+
+.landing-glow {
+  background:
+    linear-gradient(rgba(139, 92, 246, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 75%);
+}
+
+@keyframes landing-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-enter {
+  animation: landing-enter 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.landing-enter-delay-1 { animation-delay: 80ms; }
+.landing-enter-delay-2 { animation-delay: 160ms; }
+.landing-enter-delay-3 { animation-delay: 240ms; }
+.landing-enter-delay-4 { animation-delay: 320ms; }
+
+.tab-nav {
+  scrollbar-width: none;
+}
+
+.tab-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-btn-active {
+  box-shadow: 0 0 24px rgba(139, 92, 246, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
 }
