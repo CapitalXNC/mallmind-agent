@@ -11,6 +11,10 @@ export interface Message {
   isLoading?: boolean;
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'Unknown error';
+}
+
 export function useAgent() {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -53,11 +57,11 @@ export function useAgent() {
           id: `agent-${Date.now()}`
         } : m
       ));
-    } catch (err: any) {
+    } catch (err: unknown) {
       setMessages(prev => prev.map(m =>
         m.isLoading ? {
           ...m,
-          content: `Error: ${err.message}`,
+          content: `Error: ${getErrorMessage(err)}`,
           isLoading: false,
           id: `error-${Date.now()}`
         } : m
@@ -99,11 +103,11 @@ export function useAgent() {
           id: `agent-${Date.now()}`
         } : m
       ));
-    } catch (err: any) {
+    } catch (err: unknown) {
       setMessages(prev => prev.map(m =>
         m.isLoading ? {
           ...m,
-          content: `Error: ${err.message}`,
+          content: `Error: ${getErrorMessage(err)}`,
           isLoading: false
         } : m
       ));
