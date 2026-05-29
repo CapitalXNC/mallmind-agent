@@ -1,6 +1,5 @@
 import { connectDB } from '../db/connection.js';
 
-// Zone performance over last N hours
 export async function getZonePerformance(hours = 24) {
   const db = await connectDB();
   const since = new Date(Date.now() - hours * 3600 * 1000);
@@ -41,7 +40,6 @@ export async function getZonePerformance(hours = 24) {
   ]).toArray();
 }
 
-// Hourly traffic pattern for a zone
 export async function getHourlyPattern(zoneId, days = 7) {
   const db = await connectDB();
   const since = new Date(Date.now() - days * 24 * 3600 * 1000);
@@ -67,7 +65,6 @@ export async function getHourlyPattern(zoneId, days = 7) {
   ]).toArray();
 }
 
-// Mall-wide incident summary
 export async function getIncidentSummary(days = 7) {
   const db = await connectDB();
   const since = new Date(Date.now() - days * 24 * 3600 * 1000);
@@ -127,7 +124,6 @@ export async function getIncidentSummary(days = 7) {
   };
 }
 
-// Campaign effectiveness
 export async function getCampaignStats(days = 7) {
   const db = await connectDB();
   const since = new Date(Date.now() - days * 24 * 3600 * 1000);
@@ -146,7 +142,6 @@ export async function getCampaignStats(days = 7) {
   ]).toArray();
 }
 
-// Real-time traffic trend (last 2 hours, per zone)
 export async function getTrafficTrend(zoneId) {
   const db = await connectDB();
   const since = new Date(Date.now() - 2 * 3600 * 1000);

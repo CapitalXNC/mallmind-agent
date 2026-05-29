@@ -50,10 +50,8 @@ export async function findSimilarIncidents(args) {
   const { query, limit } = normalizeSimilarityArgs(args);
   const db = await connectDB();
 
-  // Generate embedding for the query
   const queryEmbedding = await generateEmbedding(query);
   if (!queryEmbedding) {
-    // Fallback to text search if embedding fails
     return db.collection('incidents')
       .find({ status: 'resolved' })
       .sort({ createdAt: -1 })
@@ -62,7 +60,6 @@ export async function findSimilarIncidents(args) {
   }
 
   try {
-    // Atlas Vector Search
     const results = await db.collection('incidents').aggregate([
       {
         $vectorSearch: {
@@ -91,7 +88,6 @@ export async function findSimilarIncidents(args) {
 
     return results;
   } catch (err) {
-    // Vector index not set up yet — fallback to recency
     console.log('Vector search fallback (index not ready):', err.message);
     return db.collection('incidents')
       .find({ status: 'resolved' })

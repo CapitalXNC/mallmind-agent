@@ -5,7 +5,6 @@ import { dirname, resolve } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load .env in development, Cloud Run uses real env vars in production
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: resolve(__dirname, '../../.env') });
 }

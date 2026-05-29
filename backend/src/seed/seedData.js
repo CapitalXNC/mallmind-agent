@@ -8,8 +8,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 dotenv.config({ path: resolve(__dirname, '../../../.env') });
 
-// ── STATIC CONFIG: ZONES ──────────────────────────────────────────
-// These are real mall layout config — not sensor data, never changes
 const zones = [
   {
     zoneId: 'zone-north',
@@ -63,8 +61,6 @@ const zones = [
   }
 ];
 
-// ── STATIC CONFIG: TENANTS ────────────────────────────────────────
-// Real tenant directory — static config, not sensor data
 const tenants = [
   { tenantId: 't-001', name: 'Zara', zoneId: 'zone-north', category: 'fashion', floor: 1, unit: 'N-101', contact: { manager: 'Sarah Chen', phone: '555-0101', email: 'sarah.chen@zara-mall.com' }, monthlyRent: 8500, avgDailyRevenue: 4200 },
   { tenantId: 't-002', name: 'Apple Store', zoneId: 'zone-north', category: 'electronics', floor: 1, unit: 'N-102', contact: { manager: 'Mike Torres', phone: '555-0102', email: 'mtorres@apple-partner.com' }, monthlyRent: 14000, avgDailyRevenue: 18000 },
@@ -95,14 +91,12 @@ async function seed() {
   console.log('Creating indexes...');
   await createCollectionsAndIndexes();
 
-  // Wipe all collections clean
   const collections = ['zones', 'tenants', 'foot_traffic', 'incidents', 'campaigns', 'agent_logs'];
   for (const col of collections) {
     await db.collection(col).deleteMany({});
     console.log(`Cleared: ${col}`);
   }
 
-  // Only seed static config — no fake traffic, incidents or campaigns
   await db.collection('zones').insertMany(zones);
   console.log(`Seeded ${zones.length} zones (static layout config)`);
 

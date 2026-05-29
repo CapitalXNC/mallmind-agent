@@ -7,8 +7,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 dotenv.config({ path: resolve(__dirname, '../../../.env') });
 
-// Real mall traffic patterns by zone and hour (people per reading)
-// Based on published retail foot traffic research for US indoor malls
 const ZONE_PROFILES = {
   'zone-north': {
     name: 'North Wing',
@@ -50,18 +48,14 @@ function generateReading(zoneId, profile, weatherMultiplier = 1.0) {
   const hour = now.getHours();
   const minute = now.getMinutes();
 
-  // Interpolate between current hour and next for smooth transitions
   const currentBase = profile.hourlyBase[hour];
   const nextBase = profile.hourlyBase[(hour + 1) % 24];
   const interpolated = currentBase + (nextBase - currentBase) * (minute / 60);
 
-  // Apply weather multiplier (rain drives people indoors)
   const weatherAdjusted = interpolated * weatherMultiplier;
 
-  // Add realistic noise (+/- 12%)
   const noise = weatherAdjusted * (0.88 + Math.random() * 0.24);
 
-  // Random surge event (3% chance per reading)
   const isSurge = Math.random() < 0.03;
   const surgeMultiplier = isSurge ? 1.4 + Math.random() * 0.4 : 1.0;
 
@@ -102,7 +96,6 @@ async function fetchWeatherMultiplier() {
     const condition = data.weather[0].main;
     const temp = data.main.temp;
 
-    // Rain and extreme heat push people indoors
     if (['Rain', 'Drizzle', 'Thunderstorm'].includes(condition)) return 1.2;
     if (temp > 95) return 1.15;
     if (condition === 'Clear' && temp > 65 && temp < 85) return 0.9;
@@ -119,7 +112,6 @@ export async function startSimulator(intervalSeconds = 30) {
   const db = await connectDB();
   console.log(`Live traffic simulator started — inserting readings every ${intervalSeconds}s`);
 
-  // Refresh weather every 10 ticks (~5 minutes)
   async function tick() {
     weatherRefreshCounter++;
     if (weatherRefreshCounter % 10 === 1) {
@@ -143,7 +135,135 @@ export async function startSimulator(intervalSeconds = 30) {
     );
   }
 
-  // Run immediately then on interval
   await tick();
   setInterval(tick, intervalSeconds * 1000);
+}
+
+async function runPatrol() {
+  try {
+    const db = await connectDB();
+    const now = new Date();
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+
+    const latestReadings = await db.collection('foot_traffic').aggregate([
+      { $sort: { timestamp: -1 } },
+      { $group: { _id: '$zoneId', latest: { $first: '$$ROOT' } } },
+      { $replaceRoot: { newRoot: '$latest' } }
+    ]).toArray();
+
+    for (const reading of latestReadings) {
+      const { zoneId, zoneName, occupancyPct, alertLevel, count, capacity } = reading;
+
+      if (alertLevel !== 'critical' && alertLevel !== 'high') continue;
+
+      const recentIncident = await db.collection('incidents').findOne({
+        zoneId,
+        status: { $in: ['open', 'in_progress'] },
+        type: 'crowd_surge',
+        createdAt: { $gte: new Date(now.getTime() - 30 * 60 * 1000) }
+      });
+
+      if (recentIncident) continue;
+
+      const incidentId = `inc-auto-${Date.now()}-${zoneId}`;
+      const severity = alertLevel === 'critical' ? 'critical' : 'high';
+
+      const incident = {
+        incidentId,
+        type: 'crowd_surge',
+        zoneId,
+        zoneName,
+        title: `${alertLevel === 'critical' ? 'Critical' : 'High'} Occupancy Detected — ${zoneName}`,
+        description: `Automated patrol detected ${occupancyPct}% occupancy (${count}/${capacity} people) in ${zoneName}. Alert level: ${alertLevel.toUpperCase()}. Patrol timestamp: ${now.toISOString()}.`,
+        severity,
+        status: 'open',
+        createdAt: now,
+        resolvedAt: null,
+        agentActions: [`Auto-patrol detected ${alertLevel} occupancy at ${occupancyPct}%`],
+        affectedTenants: [],
+        source: 'auto-patrol',
+        embedding: null
+      };
+
+      const tenants = await db.collection('tenants')
+        .find({ zoneId })
+        .toArray();
+
+      incident.affectedTenants = tenants.map(t => t.tenantId);
+
+      await db.collection('incidents').insertOne(incident);
+
+      if (alertLevel === 'critical') {
+        const campaignId = `camp-auto-${Date.now()}-${zoneId}`;
+
+        const lowestZone = latestReadings
+          .filter(r => r.zoneId !== zoneId)
+          .sort((a, b) => a.occupancyPct - b.occupancyPct)[0];
+
+        const redirectMsg = lowestZone
+          ? `${zoneName} is currently at high capacity. For a better experience, explore ${lowestZone.zoneName} which has plenty of space right now.`
+          : `${zoneName} is currently at high capacity. Please explore other areas of the mall for a more comfortable experience.`;
+
+        await db.collection('campaigns').insertOne({
+          campaignId,
+          title: `Auto: ${zoneName} Crowd Dispersal`,
+          type: 'crowd_dispersal',
+          targetZoneId: zoneId,
+          targetTenantIds: incident.affectedTenants,
+          message: redirectMsg,
+          channel: ['digital_signage', 'mall_app'],
+          status: 'active',
+          triggeredBy: 'auto-patrol',
+          incidentId,
+          createdAt: now,
+          metrics: { reach: 0, estimatedRevenueImpact: 0 }
+        });
+
+        await db.collection('incidents').updateOne(
+          { incidentId },
+          { $push: { agentActions: `Auto-patrol triggered crowd dispersal campaign` } }
+        );
+
+        console.log(`[AUTO-PATROL] Critical incident + campaign created for ${zoneName} (${occupancyPct}%)`);
+      } else {
+        console.log(`[AUTO-PATROL] High incident created for ${zoneName} (${occupancyPct}%)`);
+      }
+    }
+
+    const staleIncidents = await db.collection('incidents').find({
+      status: { $in: ['open', 'in_progress'] },
+      type: 'crowd_surge',
+      source: 'auto-patrol',
+      createdAt: { $lte: new Date(now.getTime() - 60 * 60 * 1000) }
+    }).toArray();
+
+    for (const incident of staleIncidents) {
+      const currentReading = latestReadings.find(r => r.zoneId === incident.zoneId);
+      if (currentReading && currentReading.alertLevel === 'low' || currentReading?.alertLevel === 'normal') {
+        await db.collection('incidents').updateOne(
+          { incidentId: incident.incidentId },
+          {
+            $set: { status: 'resolved', resolvedAt: now },
+            $push: { agentActions: 'Auto-resolved: zone returned to normal occupancy' }
+          }
+        );
+
+        await db.collection('campaigns').updateMany(
+          { incidentId: incident.incidentId, status: 'active' },
+          { $set: { status: 'completed' } }
+        );
+
+        console.log(`[AUTO-PATROL] Auto-resolved incident for ${incident.zoneName}`);
+      }
+    }
+
+  } catch (err) {
+    console.error('[AUTO-PATROL] Error:', err.message);
+  }
+}
+
+export async function startPatrol(intervalMinutes = 5) {
+  console.log(`Auto-patrol started — scanning every ${intervalMinutes} minutes`);
+  await runPatrol(); 
+  setInterval(runPatrol, intervalMinutes * 60 * 1000);
 }
