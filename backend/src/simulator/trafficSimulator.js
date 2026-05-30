@@ -160,7 +160,7 @@ async function runPatrol() {
         zoneId,
         status: { $in: ['open', 'in_progress'] },
         type: 'crowd_surge',
-        createdAt: { $gte: new Date(now.getTime() - 30 * 60 * 1000) }
+        createdAt: { $gte: new Date(now.getTime() - 2 * 60 * 60 * 1000) }
       });
 
       if (recentIncident) continue;
@@ -234,7 +234,7 @@ async function runPatrol() {
       status: { $in: ['open', 'in_progress'] },
       type: 'crowd_surge',
       source: 'auto-patrol',
-      createdAt: { $lte: new Date(now.getTime() - 60 * 60 * 1000) }
+      createdAt: { $lte: new Date(now.getTime() - 2 * 60 * 60 * 1000) }
     }).toArray();
 
     for (const incident of staleIncidents) {
