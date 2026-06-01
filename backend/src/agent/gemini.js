@@ -75,23 +75,27 @@ export async function runAgentQuery(userMessage, sessionId) {
       break;
     }
 
-    // Fix: send each tool result as a separate content item
-    for (const part of functionCalls) {
-      const { name, args } = part.functionCall;
-      toolsUsed.push(name);
-      const result = await runTool(name, args);
+    const functionResponseParts = [];
 
-      contents.push({
-        role: 'user',
-        parts: [{
-          functionResponse: {
-            name,
-            response: { output: JSON.stringify(result) }
-          }
-        }]
-      });
+for (const part of functionCalls) {
+  const { name, args } = part.functionCall;
+  toolsUsed.push(name);
+  const result = await runTool(name, args);
+
+  functionResponseParts.push({
+    functionResponse: {
+      name,
+      response: { output: JSON.stringify(result) }
     }
-  }
+  });
+}
+
+contents.push({
+  role: 'user',
+  parts: functionResponseParts
+});
+
+}
 
   await logAgentAction({
     sessionId,

@@ -15,6 +15,10 @@ export async function createCollectionsAndIndexes() {
   await traffic.createIndex({ zoneId: 1, timestamp: -1 });
   await traffic.createIndex({ timestamp: -1 });
   await traffic.createIndex({ alertLevel: 1 });
+  await traffic.createIndex(
+    { timestamp: 1 },
+    { expireAfterSeconds: 86400 }
+  );
 
   const incidents = db.collection('incidents');
   await incidents.createIndex({ status: 1, createdAt: -1 });

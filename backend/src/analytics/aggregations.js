@@ -37,7 +37,7 @@ export async function getZonePerformance(hours = 24) {
       }
     },
     { $sort: { riskScore: -1 } }
-  ]).toArray();
+  ], { allowDiskUse: true }).toArray();
 }
 
 export async function getHourlyPattern(zoneId, days = 7) {
@@ -62,7 +62,7 @@ export async function getHourlyPattern(zoneId, days = 7) {
       }
     },
     { $sort: { hour: 1 } }
-  ]).toArray();
+  ], { allowDiskUse: true }).toArray();
 }
 
 export async function getIncidentSummary(days = 7) {
@@ -74,19 +74,19 @@ export async function getIncidentSummary(days = 7) {
       { $match: { createdAt: { $gte: since } } },
       { $group: { _id: '$type', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
-    ]).toArray(),
+    ], { allowDiskUse: true }).toArray(),
 
     db.collection('incidents').aggregate([
       { $match: { createdAt: { $gte: since } } },
       { $group: { _id: '$severity', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
-    ]).toArray(),
+    ], { allowDiskUse: true }).toArray(),
 
     db.collection('incidents').aggregate([
       { $match: { createdAt: { $gte: since } } },
       { $group: { _id: '$zoneName', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
-    ]).toArray(),
+    ], { allowDiskUse: true }).toArray(),
 
     db.collection('incidents').aggregate([
       {
@@ -113,7 +113,7 @@ export async function getIncidentSummary(days = 7) {
           totalResolved: { $sum: 1 }
         }
       }
-    ]).toArray()
+    ], { allowDiskUse: true }).toArray()
   ]);
 
   return {
@@ -139,7 +139,7 @@ export async function getCampaignStats(days = 7) {
       }
     },
     { $sort: { count: -1 } }
-  ]).toArray();
+  ], { allowDiskUse: true }).toArray();
 }
 
 export async function getTrafficTrend(zoneId) {
@@ -176,5 +176,5 @@ export async function getTrafficTrend(zoneId) {
       }
     },
     { $sort: { timestamp: 1 } }
-  ]).toArray();
+  ], { allowDiskUse: true }).toArray();
 }

@@ -169,7 +169,7 @@ app.get('/api/dashboard', async (req, res) => {
         { $group: { _id: '$zoneId', latest: { $first: '$$ROOT' } } },
         { $replaceRoot: { newRoot: '$latest' } },
         { $sort: { zoneId: 1 } }
-      ]).toArray(),
+      ], { allowDiskUse: true }).toArray(),
 
       db.collection('incidents')
         .find({ status: { $in: ['open', 'in_progress'] } })
