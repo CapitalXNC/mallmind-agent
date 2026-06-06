@@ -7,6 +7,7 @@ import { runScenario, SCENARIOS } from './scenarios/scenarioRunner.js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import rateLimit from 'express-rate-limit';
 import { agentModel, genaiBackend, genaiLocation, genaiProject } from './lib/genai.js';
 import {
   getZonePerformance,
@@ -42,6 +43,17 @@ app.get('/health', (req, res) => {
     timestamp: new Date()
   });
 });
+
+const agentLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 4,
+  message: { error: 'Too many requests. Please wait a minute before trying again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/agent', agentLimiter);
+app.use('/api/scenarios', agentLimiter);
 
 app.post('/api/agent', async (req, res) => {
   const { message, sessionId } = req.body;
