@@ -28,10 +28,10 @@ app.use(cors({
   origin: [
     'http://localhost:3000',
     'https://mallmind-agent.vercel.app',
-    'https://mallmind-agent-o3k7l6og3-somnilmitra123-8259s-projects.vercel.app'
+    'https://mallmind-agent-git-main-somnilmitra123-8259s-projects.vercel.app'
   ],
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type']
 }));
 
 app.use(express.json());
@@ -47,10 +47,21 @@ app.get('/health', (req, res) => {
 const agentLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 4,
-  message: { error: 'Too many requests. Please wait a minute before trying again.' },
+  message: { error: 'Too many requests. Please wait a minute.' },
   standardHeaders: true,
-  legacyHeaders: false,
+  legacyHeaders: false
 });
+
+const dashboardLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+app.use('/api/agent', agentLimiter);
+app.use('/api/scenarios', agentLimiter);
+app.use('/api/dashboard', dashboardLimiter);
 
 app.use('/api/agent', agentLimiter);
 app.use('/api/scenarios', agentLimiter);
